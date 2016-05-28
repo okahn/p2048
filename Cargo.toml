@@ -1,0 +1,6 @@
+[package]
+name = "p2048"
+version = "0.1.0"
+authors = ["okahn"]
+
+[dependencies]
