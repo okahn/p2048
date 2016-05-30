@@ -2,6 +2,10 @@ extern crate rand;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
+extern crate nix;
+use nix::sys::termios;
+use std::io::Read;
+
 type Square = u16;
 type Board = [Square; 16];
 
@@ -28,10 +32,8 @@ fn shift_board(dir: Dir, b: &Board) -> Board {
         Dir::Down  => 4*(3-j) + i,
     };
     for i in 0..4 {
-        let line = shift_line([b[i1(i).0],
-                               b[i1(i).1],
-                               b[i1(i).2],
-                               b[i1(i).3]]);
+        let k = i1(i);
+        let line = shift_line([b[k.0], b[k.1], b[k.2], b[k.3]]);
         for j in 0..4 {
             new_board[i2(i, j)] = line[j];
         }
@@ -65,7 +67,7 @@ fn shift_line(line: [Square; 4]) -> [Square; 4] {
     return new_line;
 }
 
-/* Randomly place a new piece. */
+/* Randomly place a new piece or do nothing if impossible. */
 fn place(b: &Board) -> Board {
     let mut rng = rand::thread_rng();
     let mut ret = [0; 16];
@@ -76,6 +78,9 @@ fn place(b: &Board) -> Board {
             acc.push(i);
         }
     }
+    if acc.len() == 0 {
+        return ret;
+    }
     let between = Range::new(0, acc.len());
     let x : f64 = rng.gen();
     let new = if x < 0.9 { 1 } else { 2 };
@@ -84,9 +89,51 @@ fn place(b: &Board) -> Board {
     return ret;
 }
 
+fn pretty_print(b: &Board) {
+    println!("{:?}", &b[0..4]);
+    println!("{:?}", &b[4..8]);
+    println!("{:?}", &b[8..12]);
+    println!("{:?}", &b[12..16]);
+}
+
 fn main() {
-    println!("{:?}", shift_board(Dir::Left , &[0, 0, 1, 1,
-                                               0, 1, 0, 1,
-                                               1, 0, 1, 1,
-                                               1, 2, 2, 1]));
+    let saved_term = termios::tcgetattr(0).unwrap();
+    let mut term = saved_term;
+    // Unset canonical mode, so we get characters immediately
+    term.c_lflag.remove(termios::ICANON);
+    // Don't generate signals on Ctrl-C and friends
+    term.c_lflag.remove(termios::ISIG);
+    // Disable local echo
+    term.c_lflag.remove(termios::ECHO);
+    termios::tcsetattr(0, termios::TCSADRAIN, &term).unwrap();
+    println!("Press Ctrl-C to quit");
+
+    let mut b = [0; 16];
+    b = place(&b);
+    pretty_print(&b);
+    for byte in std::io::stdin().bytes() {
+        let byte = byte.unwrap();
+        let b2;
+        if byte == 3 {
+            break;
+        }
+        let dir = match byte {
+            119 => Some(Dir::Up),
+            97  => Some(Dir::Left),
+            115 => Some(Dir::Down),
+            100 => Some(Dir::Right),
+            _   => None,
+        };
+        match dir {
+            Some(x) => b2 = shift_board(x, &b),
+            None => continue,
+        }
+        if b != b2 {
+            b = place(&b2);
+        }
+        println!("");
+        pretty_print(&b);
+    }
+
+    termios::tcsetattr(0, termios::TCSADRAIN, &saved_term).unwrap();
 }
