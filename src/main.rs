@@ -89,11 +89,32 @@ fn place(b: &Board) -> Board {
     return ret;
 }
 
+fn prep(n: Square) -> String {
+    if n == 0 {
+        return "    ".to_string();
+    } else {
+        let n = 2u32.pow(n as u32);
+        if n >= 100 {
+            return format!("{:4}", n);
+        } else if n >= 10 {
+            return format!("{}{}", n, n);
+        } else {
+            return format!("{}{}{}{}", n, n, n, n);
+        }
+    }
+}
+
 fn pretty_print(b: &Board) {
-    println!("{:?}", &b[0..4]);
-    println!("{:?}", &b[4..8]);
-    println!("{:?}", &b[8..12]);
-    println!("{:?}", &b[12..16]);
+    for i in 0..4 {
+        for _ in 0..4 {
+            println!("|{} {} {} {}|",
+                    prep(b[4*i]),
+                    prep(b[4*i + 1]),
+                    prep(b[4*i + 2]),
+                    prep(b[4*i + 3]))
+        }
+        println!("");
+    }
 }
 
 fn main() {
